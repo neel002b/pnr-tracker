@@ -3,12 +3,13 @@ const getPnrStatus = require("./pnrScraper");
 const TelegramBot = require("node-telegram-bot-api");
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
+const bot = new TelegramBot(TELEGRAM_BOT_TOKEN);
 
 let userSession = {
   chatId: null,
   pnr: null,
-  lastStatus: ""
+  lastStatus: "",
+  lastPassengerStatuses: []  // NEW: Track each passenger's current status
 };
 
 bot.on("message", async (msg) => {
@@ -28,11 +29,21 @@ bot.on("message", async (msg) => {
       }
     });
 
-    // Run immediately
-    await checkPnr();
 
-    // Check every 10 minutes
-    setInterval(checkPnr, 10 * 60 * 1000);
+    const statusLines = await getPnrStatus(text);
+    const currentStatuses = statusLines
+      .filter(line => line.startsWith("👤 Passenger"))
+      .map(line => {
+        const match = line.match(/→ (.*?) \|/);
+        return match ? match[1].trim() : null;
+      });
+
+    userSession.lastStatus = statusLines.join("\n");
+    userSession.lastPassengerStatuses = currentStatuses;
+
+    await bot.sendMessage(chatId, `📥 Initial status fetched. I will notify you if it changes.`);
+
+
   } else {
     bot.sendMessage(chatId, "🔢 Please send a valid 10-digit PNR number.");
   }
@@ -72,27 +83,31 @@ bot.on("callback_query", async (callbackQuery) => {
 
 // ✅ Auto Check Logic
 async function checkPnr() {
-  const { chatId, pnr, lastStatus } = userSession;
+  const { chatId, pnr, lastPassengerStatuses } = userSession;
   if (!chatId || !pnr) return;
 
   try {
     const statusLines = await getPnrStatus(pnr);
     const newStatus = statusLines.join("\n");
 
-    if (newStatus !== lastStatus) {
-      await bot.sendMessage(chatId, `🔔 PNR ${pnr} status updated:\n${newStatus}`, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔄 Refresh", callback_data: "refresh_pnr" }]
-          ]
-        }
+    const currentStatuses = statusLines
+      .filter(line => line.startsWith("👤 Passenger"))
+      .map(line => {
+        const match = line.match(/→ (.*?) \|/);
+        return match ? match[1].trim() : null;
       });
+
+    const hasChanged = currentStatuses.some((status, i) => status !== lastPassengerStatuses[i]);
+
+    if (hasChanged) {
+      await bot.sendMessage(chatId, `🔔 PNR ${pnr} status updated:\n${newStatus}`);
       userSession.lastStatus = newStatus;
+      userSession.lastPassengerStatuses = currentStatuses;
     } else {
-      console.log("✅ No change in PNR status.");
+      console.log("✅ No change in passenger status.");
     }
   } catch (error) {
     console.error("❌ Error checking PNR:", error.message);
-    bot.sendMessage(chatId, "❌ Error checking your PNR. Please try again later.");
+    bot.sendMessage(chatId, "❌ " + error.message);
   }
 }

@@ -17,6 +17,11 @@ async function getPnrStatus(pnrNumber) {
 
         const html = response.data;
         const $ = cheerio.load(html);
+
+        if ($("#status_not_fetched").length > 0) {
+             return [`⚠️ Unable to fetch status right now. Try again later.`];
+        }
+
         const statusLines = [];
 
         // Extract train details
@@ -72,12 +77,11 @@ async function getPnrStatus(pnrNumber) {
 
 
         if (statusLines.length === 0) {
-            throw new Error("PNR status not found or invalid PNR");
+            return [`⚠️ No status information found for PNR ${pnrNumber}.`];
         }
 
         return statusLines;
     } catch (error) {
-        console.log(error);
         console.error("❌ Error in getPnrStatus:", error.message);
         throw error;
     }
