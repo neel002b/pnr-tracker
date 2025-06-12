@@ -5,7 +5,7 @@ const getPnrStatus = require("./pnrScraper");
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const SERVER_URL = process.env.BASE_URL; // e.g. https://your-app.onrender.com
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 // ✅ Initialize bot WITHOUT port binding (let Express handle it)
 const bot = new TelegramBot(TELEGRAM_BOT_TOKEN);
