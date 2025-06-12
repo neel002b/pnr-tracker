@@ -4,16 +4,14 @@ const TelegramBot = require("node-telegram-bot-api");
 const getPnrStatus = require("./pnrScraper");
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const SERVER_URL = process.env.BASE_URL; // Example: https://pnr-tracker.onrender.com
+const SERVER_URL = process.env.BASE_URL; // e.g. https://your-app.onrender.com
 const PORT = process.env.PORT || 3000;
 
-// Initialize bot with webhook
-const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, {
-  webHook: { port: PORT },
-});
+// ✅ Initialize bot WITHOUT port binding (let Express handle it)
+const bot = new TelegramBot(TELEGRAM_BOT_TOKEN);
 bot.setWebHook(`${SERVER_URL}/bot${TELEGRAM_BOT_TOKEN}`);
 
-// Express server to handle webhook
+// ✅ Express app handles webhook
 const app = express();
 app.use(express.json());
 
@@ -31,7 +29,7 @@ app.listen(PORT, () => {
 });
 
 // ===============================
-// PNR Bot Logic
+// 🔁 PNR Bot Logic
 // ===============================
 
 let userSession = {
@@ -40,7 +38,7 @@ let userSession = {
   lastStatus: "",
 };
 
-// Handle user message (PNR input)
+// 📥 Handle user message (PNR input)
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text.trim();
@@ -50,7 +48,7 @@ bot.on("message", async (msg) => {
     userSession.pnr = text;
     userSession.lastStatus = "";
 
-    await bot.sendMessage(chatId, `✅ Got your PNR: ${text}. I will notify you if status changes.`, {
+    await bot.sendMessage(chatId, `✅ Got your PNR: ${text}. I will notify you if the status changes.`, {
       reply_markup: {
         inline_keyboard: [[{ text: "🔄 Refresh Now", callback_data: "refresh_pnr" }]],
       },
@@ -63,7 +61,7 @@ bot.on("message", async (msg) => {
   }
 });
 
-// Handle refresh button
+// 🔘 Refresh button click
 bot.on("callback_query", async (callbackQuery) => {
   const chatId = callbackQuery.message.chat.id;
   const data = callbackQuery.data;
@@ -93,7 +91,7 @@ bot.on("callback_query", async (callbackQuery) => {
   }
 });
 
-// Check PNR and notify if changed
+// 🔔 Auto-check for updates
 async function checkPnr() {
   const { chatId, pnr, lastStatus } = userSession;
   if (!chatId || !pnr) return;
